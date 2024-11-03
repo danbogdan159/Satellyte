@@ -55,7 +55,8 @@
           }
           viewer.entities.add({
             position: positionsOverTime,
-            point: {pixelSize: 10, color: Cesium.Color.RED}
+            point: {pixelSize: 10, color: Cesium.Color.RED},
+            label: {text: data.member[j].name, font: "10pt monospace", style: Cesium.LabelStyle.FILL_AND_OUTLINE, outlineWidth: 2, verticalOrigin: Cesium.VerticalOrigin.TOP, pixelOffset: new Cesium.Cartesian2(0, 16),},
           })
         };
       }
