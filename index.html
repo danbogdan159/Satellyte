@@ -9,6 +9,26 @@
 <body>
   <div id="cesiumContainer"></div>
   <script>
+    const viewer = new Cesium.Viewer('cesiumContainer', {
+    imageryProvider: new Cesium.TileMapServiceImageryProvider({
+        url: Cesium.buildModuleUrl("Assets/Textures/NaturalEarthII"),
+      }),
+      baseLayerPicker: false, geocoder: false, homeButton: false, infoBox: false,
+      navigationHelpButton: false, sceneModePicker: false
+    });
+    viewer.scene.globe.enableLighting = true;
+    const totalSeconds = 60 * 60 * 6
+    const timestepInSeconds = 10;
+    const start = Cesium.JulianDate.fromDate(new Date());
+    const stop = Cesium.JulianDate.addSeconds(start, totalSeconds, new Cesium.JulianDate());
+    viewer.clock.startTime = start.clone();
+    viewer.clock.stopTime = stop.clone();
+    viewer.clock.currentTime = start.clone();
+    viewer.timeline.zoomTo(start, stop);
+    viewer.clock.multiplier = 40;
+    viewer.clock.clockRange = Cesium.ClockRange.LOOP_STOP;
+    viewer.clock.shouldAnimate = true;
+    
     async function getData(){
       try{
         const response = await fetch('https://tle.ivanstanojevic.me/api/tle')
@@ -16,38 +36,33 @@
           throw new Error('Could not retrieve data');
         }
         const data = await response.json();
-        for(let i = 0; i < data.member.length; i++){
-          const line1 = data.member[i].line1;
-          const line2 = data.member[i].line2;
+        for(let j = 0; j < data.member.length; j++){
+          const line1 = data.member[j].line1;
+          const line2 = data.member[j].line2;
           console.log(`TLE Lines: ${line1}, ${line2}`);
           const satrec = satellite.twoline2satrec(line1, line2);
-          const positionAndVelocity = satellite.propagate(satrec, new Date());
-          if(positionAndVelocity.position) {
-            const gmst = satellite.gstime(new Date());
-            const position = satellite.eciToGeodetic(positionAndVelocity.position, gmst);
-          
-            const satellitePoint = viewer.entities.add({
-              position: Cesium.Cartesian3.fromRadians(
-                position.longitude, position.latitude, position.height * 1000
-              ),
-              point: { pixelSize: 10, color: Cesium.Color.RED }
-            
-            });
-          };
+          const positionsOverTime = new Cesium.SampledPositionProperty();
+          for (let k = 0; k < totalSeconds; k+= timestepInSeconds) {
+            const time = Cesium.JulianDate.addSeconds(start, k, new Cesium.JulianDate());
+            const jsDate = Cesium.JulianDate.toDate(time);
+            const positionAndVelocity = satellite.propagate(satrec, jsDate);
+            if (positionAndVelocity.position) {
+              const gmst = satellite.gstime(jsDate);
+              const p = satellite.eciToGeodetic(positionAndVelocity.position, gmst);
+              const position = Cesium.Cartesian3.fromRadians(p.longitude, p.latitude, p.height * 1000);
+              positionsOverTime.addSample(time, position);
+            }
+          }
+          viewer.entities.add({
+            position: positionsOverTime,
+            point: {pixelSize: 10, color: Cesium.Color.RED}
+          })
         };
       }
       catch(error){
         console.error(error);
       }
     };
-    const viewer = new Cesium.Viewer('cesiumContainer', {
-      imageryProvider: new Cesium.TileMapServiceImageryProvider({
-        url: Cesium.buildModuleUrl("Assets/Textures/NaturalEarthII"),
-      }),
-      baseLayerPicker: false, geocoder: false, homeButton: false, infoBox: false,
-      navigationHelpButton: false, sceneModePicker: false
-    });
-    viewer.scene.globe.enableLighting = true;
     getData();
   </script>
 </body>
