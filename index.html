@@ -29,23 +29,37 @@
     viewer.clock.clockRange = Cesium.ClockRange.LOOP_STOP;
     viewer.clock.shouldAnimate = true;
     
+    const satNum = 20
+    const url = `https://tle.ivanstanojevic.me/api/tle/?page-size=${satNum}`
+
     async function getData(){
       try{
-        const response = await fetch('https://tle.ivanstanojevic.me/api/tle')
+        const response = await fetch(url)
         if(!response.ok){
           throw new Error('Could not retrieve data');
         }
         const data = await response.json();
-        for(let j = 0; j < data.member.length; j++){
+        parseData(data);
+      }
+      catch(error){
+        console.error(error);
+      }
+    }
+    function parseData(data){
+      for(let j = 0; j < data.member.length; j++){
           const line1 = data.member[j].line1;
           const line2 = data.member[j].line2;
-          console.log(`TLE Lines: ${line1}, ${line2}`);
-          const satrec = satellite.twoline2satrec(line1, line2);
-          const positionsOverTime = new Cesium.SampledPositionProperty();
+          console.log(data.member[j].name);
+          const satRec = satellite.twoline2satrec(line1, line2);
+          calcPosition(satRec, data.member[j].name);
+      }
+    }
+    function calcPosition(satRec, satName){
+      const positionsOverTime = new Cesium.SampledPositionProperty();
           for (let k = 0; k < totalSeconds; k+= timestepInSeconds) {
             const time = Cesium.JulianDate.addSeconds(start, k, new Cesium.JulianDate());
             const jsDate = Cesium.JulianDate.toDate(time);
-            const positionAndVelocity = satellite.propagate(satrec, jsDate);
+            const positionAndVelocity = satellite.propagate(satRec, jsDate);
             if (positionAndVelocity.position) {
               const gmst = satellite.gstime(jsDate);
               const p = satellite.eciToGeodetic(positionAndVelocity.position, gmst);
@@ -53,17 +67,15 @@
               positionsOverTime.addSample(time, position);
             }
           }
-          viewer.entities.add({
+          plotPoint(positionsOverTime, satName);
+    }
+    function plotPoint(positionsOverTime, satName){
+      viewer.entities.add({
             position: positionsOverTime,
             point: {pixelSize: 10, color: Cesium.Color.RED},
-            label: {text: data.member[j].name, font: "10pt monospace", style: Cesium.LabelStyle.FILL_AND_OUTLINE, outlineWidth: 2, verticalOrigin: Cesium.VerticalOrigin.TOP, pixelOffset: new Cesium.Cartesian2(0, 16),},
-          })
-        };
-      }
-      catch(error){
-        console.error(error);
-      }
-    };
+            label: {text: satName, font: "10pt monospace", style: Cesium.LabelStyle.FILL_AND_OUTLINE, outlineWidth: 2, verticalOrigin: Cesium.VerticalOrigin.TOP, pixelOffset: new Cesium.Cartesian2(0, 16),},
+          });
+    }
     getData();
   </script>
 </body>
